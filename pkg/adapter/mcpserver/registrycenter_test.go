@@ -17,15 +17,16 @@
 
 package mcpserver
 
-import "testing"
+import (
+	"testing"
+)
 
 import (
-	filtermcp "github.com/apache/dubbo-go-pixiu/pkg/filter/mcp/mcpserver"
-
 	"github.com/stretchr/testify/assert"
 )
 
 import (
+	filtermcp "github.com/apache/dubbo-go-pixiu/pkg/filter/mcp/mcpserver"
 	"github.com/apache/dubbo-go-pixiu/pkg/model"
 )
 
