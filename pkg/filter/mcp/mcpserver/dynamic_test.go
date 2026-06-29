@@ -414,7 +414,7 @@ func TestDebounceFeatures(t *testing.T) {
 		assert.Equal(t, 1, info["server_count"])
 	})
 
-	t.Run("Time debounce - skip rapid calls", func(t *testing.T) {
+	t.Run("Distinct fingerprints apply immediately inside debounce window", func(t *testing.T) {
 		registry := NewToolRegistry()
 		sm := transport.NewSessionManager()
 		defer sm.Stop()
@@ -440,7 +440,7 @@ func TestDebounceFeatures(t *testing.T) {
 		assert.NoError(t, err)
 		tools = registry.ListTools()
 		require.Len(t, tools, 1)
-		assert.Equal(t, "tool1", tools[0].Name, "Should still have first tool due to time debounce")
+		assert.Equal(t, "tool2", tools[0].Name, "distinct fingerprints must not be skipped by time debounce")
 	})
 
 	t.Run("Empty configuration handling", func(t *testing.T) {
@@ -469,6 +469,32 @@ func TestDebounceFeatures(t *testing.T) {
 		info := consumer.GetDebounceInfo()
 		assert.Equal(t, 1, info["server_count"])
 	})
+}
+
+func TestDynamicConsumerSourceIdentitySeparatesRegistries(t *testing.T) {
+	registry := NewToolRegistry()
+	sm := transport.NewSessionManager()
+	defer sm.Stop()
+	consumer := NewDynamicConsumer(registry, sm, transport.NewSSEHandler(sm))
+
+	err := consumer.ApplyMcpServerConfigBySource(NewServerSource("registry1", "serverA"), createTestMcpServerConfig([]model.ToolConfig{
+		createTestToolConfig("tool-r1", "R1"),
+	}))
+	require.NoError(t, err)
+
+	err = consumer.ApplyMcpServerConfigBySource(NewServerSource("registry2", "serverA"), createTestMcpServerConfig([]model.ToolConfig{
+		createTestToolConfig("tool-r2", "R2"),
+	}))
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"tool-r1", "tool-r2"}, toolConfigNames(registry.ListTools()))
+	require.Len(t, consumer.serverConfigs, 2)
+	assert.Contains(t, consumer.serverConfigs, NewServerSource("registry1", "serverA"))
+	assert.Contains(t, consumer.serverConfigs, NewServerSource("registry2", "serverA"))
+
+	err = consumer.ApplyMcpServerConfigBySource(NewServerSource("registry1", "serverA"), nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"tool-r2"}, toolConfigNames(registry.ListTools()))
 }
 
 func TestDebounceConfiguration(t *testing.T) {
